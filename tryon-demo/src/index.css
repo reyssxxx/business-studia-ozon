@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Светлая тема в духе приложения маркетплейса: белый фон, синий акцент, зелёная цена по карте.
+   Фиолетовый градиент выделяет новую ИИ-функцию примерки. */
+@theme {
+  --font-sans: "Onest", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --color-blue: #005bff;
+  --color-blue-dark: #004ad1;
+  --color-blue-soft: #e5efff;
+  --color-ink: #001a34;
+  --color-ink2: #3c4a57;
+  --color-mute: #707f8d;
+  --color-line: #e3e6e9;
+  --color-bg2: #f2f3f5;
+  --color-green: #10c44c;
+  --color-green-soft: #e7f9ed;
+  --color-red: #f91155;
+  --color-ai: #7b3dff;
+  --color-ai2: #c43bff;
+  --color-ai-soft: #f1ebff;
+  --color-star: #ffa800;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: #e9ecf1;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.ai-grad {
+  background: linear-gradient(110deg, var(--color-ai) 0%, var(--color-ai2) 100%);
+}
+.ai-text {
+  background: linear-gradient(110deg, var(--color-ai) 0%, var(--color-ai2) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes scan {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes shine {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.rise { animation: rise 0.3s ease-out both; }
+.sheet { animation: sheet 0.32s cubic-bezier(.2,.8,.2,1) both; }
+.fade { animation: fade 0.25s ease-out both; }
+.shine {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.55) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shine 2.6s linear infinite;
+}
