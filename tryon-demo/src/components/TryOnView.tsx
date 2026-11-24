@@ -19,8 +19,8 @@ export function Generating({ image, expectedMs = 25000, label }: { image: string
       <div className="relative mx-auto aspect-[3/4] w-full overflow-hidden rounded-2xl bg-bg2">
         <img src={image} alt="" className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-white/25" />
-        <div className="absolute inset-x-0 h-28 -translate-y-1/2 bg-gradient-to-b from-transparent via-[#005bff]/25 to-transparent" style={{ animation: "scan 2.6s ease-in-out infinite" }} />
-        <div className="absolute inset-x-0 h-[2px] bg-[#3380ff] shadow-[0_0_18px_#3380ff]" style={{ animation: "scan 2.6s ease-in-out infinite" }} />
+        <div className="absolute inset-x-0 h-28 -translate-y-1/2 bg-gradient-to-b from-transparent via-[#7b3dff]/30 to-transparent" style={{ animation: "scan 2.6s ease-in-out infinite" }} />
+        <div className="absolute inset-x-0 h-[2px] bg-[#a34bff] shadow-[0_0_18px_#a34bff]" style={{ animation: "scan 2.6s ease-in-out infinite" }} />
         <div className="ai-grad absolute top-3 left-3 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-semibold text-white">
           <Sparkle size={12} /> {label ?? "Нейросеть примеряет"}
         </div>
@@ -35,7 +35,7 @@ export function Generating({ image, expectedMs = 25000, label }: { image: string
 }
 
 /** Сравнение до/после: тянем ручку. */
-export function BeforeAfter({ before, after, label = "На вас" }: { before: string; after: string; label?: string }) {
+export function BeforeAfter({ before, after, label = "На вас", preview = false }: { before: string; after: string; label?: string; preview?: boolean }) {
   const [pos, setPos] = useState(100);
   const [drag, setDrag] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -77,8 +77,8 @@ export function BeforeAfter({ before, after, label = "На вас" }: { before: 
           </svg>
         </div>
       </div>
-      <span className="ai-grad absolute top-3 left-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold text-white">
-        <Sparkle size={11} /> {label}
+      <span className={`absolute top-3 left-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold ${preview ? "bg-white text-ink shadow" : "ai-grad text-white"}`}>
+        {preview ? "Предпросмотр" : <><Sparkle size={11} /> {label}</>}
       </span>
       <span className="absolute top-3 right-3 rounded-full bg-white/85 px-2.5 py-1 text-[12px] font-semibold text-ink">Было</span>
     </div>

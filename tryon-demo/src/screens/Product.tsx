@@ -37,7 +37,7 @@ export default function Product({ id }: { id: string }) {
       {/* галерея */}
       <div className="relative bg-bg2">
         <div
-          className="no-scrollbar flex aspect-[3/4] snap-x snap-mandatory overflow-x-auto"
+          className="no-scrollbar flex h-[clamp(240px,48dvh,410px)] snap-x snap-mandatory overflow-x-auto"
           onScroll={(e) => setSlide(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
           ref={(el) => {
             if (el && tried && el.dataset.init !== "1") {
@@ -77,12 +77,16 @@ export default function Product({ id }: { id: string }) {
             ))}
           </div>
         )}
-        {item.tryOn && !tried && (
-          <button onClick={startTryOn} className="ai-grad absolute right-3 bottom-3 flex items-center gap-1.5 rounded-full py-2.5 pr-4 pl-3 text-[14px] font-semibold text-white shadow-lg">
-            <Sparkle size={15} /> Примерить на себе
-          </button>
-        )}
       </div>
+
+      {item.tryOn && (
+        <div className="px-4 pt-3 text-center">
+          <Button variant="ai" className="w-full" onClick={startTryOn}>
+            <Sparkle size={16} /> {tried ? "Смотреть примерку" : "Примерить на себе"}
+          </Button>
+          <p className="mt-1.5 text-[13px] text-mute">{tried ? "Сравнение до и после" : "По фото или на аватаре"}</p>
+        </div>
+      )}
 
       <div className="px-4 pt-3">
         <Price price={item.price} old={item.oldPrice} big />
@@ -92,23 +96,6 @@ export default function Product({ id }: { id: string }) {
           <Rating rating={item.rating} reviews={item.reviews} />
           <span className="text-[13px] text-mute">· 2 тыс. купили</span>
         </div>
-
-        {/* блок примерки */}
-        {item.tryOn && (
-          <button
-            onClick={startTryOn}
-            className="rise mt-4 flex w-full items-center gap-3 rounded-2xl bg-ai-soft p-3 text-left"
-          >
-            <div className="ai-grad grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white">
-              <Sparkle size={22} />
-            </div>
-            <div className="flex-1">
-              <div className="text-[15px] font-semibold text-ink">{tried ? "Смотреть примерку" : "Примерьте на себе"}</div>
-              <div className="text-[13px] text-ink2">{tried ? "Сравните «до» и «после», соберите образ" : "Покажем, как сядет, и подскажем размер"}</div>
-            </div>
-            <span className="text-ai">{Icon.chevron()}</span>
-          </button>
-        )}
 
         {/* размеры */}
         {item.sizes.length > 1 && (

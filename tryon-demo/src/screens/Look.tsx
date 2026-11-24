@@ -56,7 +56,7 @@ export default function Look({ id }: { id: string }) {
           <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-bg2">
             <img src={results[id]} alt="" className="h-full w-full object-cover" />
             <span className="ai-grad absolute top-3 left-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold text-white">
-              <Sparkle size={11} /> {main.title} на вас
+              <Sparkle size={11} /> {main.title + " на вас"}
             </span>
           </div>
         ) : (

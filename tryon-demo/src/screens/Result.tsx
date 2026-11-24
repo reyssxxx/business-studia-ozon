@@ -13,7 +13,7 @@ import { fallback, tryOn, TryOnError } from "../lib/tryon";
 import { track } from "../lib/analytics";
 
 type State = { k: "loading" } | { k: "done"; source: string } | { k: "error"; err: TryOnError };
-type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string } | { k: "error" };
+type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string; preview: boolean } | { k: "error" };
 
 /** Через сколько секунд на экране результата считаем, что покупателю интересно (политика «по интересу») */
 const INTENT_DWELL_MS = 4000;
@@ -83,7 +83,7 @@ export default function Result({ id }: { id: string }) {
     if (!wanted || !current) return;
     if (!second) {
       // образ без второго слоя на фото (например, к платью только обувь): фото основной вещи и список
-      setLook({ k: "ready", image: base });
+      setLook({ k: "ready", image: base, preview: baseIsMock });
       shown.current = true;
       return;
     }
@@ -93,7 +93,7 @@ export default function Result({ id }: { id: string }) {
     tryOn({ person: base, item: second, timeoutMs: settings.timeoutSec * 1000, accessCode: settings.accessCode, cacheable: person?.mode === "avatar" && !settings.liveGen })
       .then((r) => {
         if (!alive) return;
-        setLook({ k: "ready", image: r.image });
+        setLook({ k: "ready", image: r.image, preview: baseIsMock || r.source === "mock" });
         if (r.source !== "cache") track({ type: "look_ready", item: id });
         shown.current = true;
       })
@@ -102,7 +102,7 @@ export default function Result({ id }: { id: string }) {
         if (baseIsMock) {
           const r = await fallback(base, second);
           if (alive) {
-            setLook({ k: "ready", image: r.image });
+            setLook({ k: "ready", image: r.image, preview: baseIsMock || r.source === "mock" });
             shown.current = true;
           }
         } else if (alive) setLook({ k: "error" });
@@ -247,7 +247,8 @@ export default function Result({ id }: { id: string }) {
             {/* слайд 1: только вещь */}
             {slide === 0 && (
               <div className="relative">
-                <BeforeAfter before={person.image} after={base} />
+                <BeforeAfter before={person.image} after={base} preview={baseIsMock} />
+                {baseIsMock && <p className="mt-2 text-center text-[13px] text-ink2">Посадка одежды условная</p>}
                 {look.k === "ready" && (
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
@@ -275,7 +276,8 @@ export default function Result({ id }: { id: string }) {
                 <LookSwitcher looks={looks} idx={lookIdx} onSelect={setLookIdx} />
                 {look.k === "ready" ? (
                   <div className="fade">
-                  <BeforeAfter before={person.image} after={look.image} label="Образ на вас" />
+                  <BeforeAfter before={person.image} after={look.image} label="Образ на вас" preview={look.preview} />
+                  {look.preview && <p className="mt-2 text-center text-[13px] text-ink2">Посадка одежды условная</p>}
                   <LookReasons look={current} />
                   </div>
                 ) : look.k === "error" ? (
@@ -316,6 +318,17 @@ export default function Result({ id }: { id: string }) {
             {/* под первым слайдом: вещь, размер, действия */}
             {slide === 0 && (
               <>
+                {advice && (
+                  <div className="mt-2 flex items-center gap-3 rounded-2xl bg-green-soft p-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-green text-[18px] font-bold text-white">{advice.size}</div>
+                    <div>
+                      <div className="text-[15px] font-semibold">Рекомендуем {advice.size}</div>
+                      <div className="text-[13px] text-ink2">По росту {body.height} см, весу {body.weight} кг и размерной сетке. {advice.note}</div>
+                    </div>
+                  </div>
+                )}
+                <Button className="mt-3 w-full" onClick={addMain}>В корзину{advice ? ` · ${advice.size}` : ""}</Button>
+                {looks.length > 0 && <Button variant="soft" className="mt-2 w-full" onClick={openLook}><Sparkle size={15} /> Собрать образ</Button>}
                 <div className="mt-3 flex items-center gap-3 rounded-2xl border border-line p-3">
                   <div className="h-14 w-11 shrink-0 overflow-hidden rounded-lg bg-bg2">
                     <img src={item.image} alt="" className="h-full w-full object-cover" />
@@ -325,15 +338,6 @@ export default function Result({ id }: { id: string }) {
                     <div className="text-[15px] font-bold text-green">{rub(cardPrice(item.price))}</div>
                   </div>
                 </div>
-                {advice && (
-                  <div className="mt-2 flex items-center gap-3 rounded-2xl bg-green-soft p-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-green text-[18px] font-bold text-white">{advice.size}</div>
-                    <div>
-                      <div className="text-[15px] font-semibold">Ваш размер: {advice.size}</div>
-                      <div className="text-[13px] text-ink2">{advice.note}</div>
-                    </div>
-                  </div>
-                )}
                 {/* оценка качества: сигнал для Ozon, насколько примерке можно верить */}
                 {st.source !== "mock" && (
                   <div className="mt-2 flex items-center justify-between rounded-2xl border border-line px-3 py-2">
@@ -366,16 +370,13 @@ export default function Result({ id }: { id: string }) {
                     Поделиться
                   </Button>
                 </div>
-                <div className="mt-3 text-center text-[12px] leading-snug text-mute">Изображение создано нейросетью. Посадка и оттенок могут немного отличаться, ориентируйтесь на рекомендацию размера.</div>
               </>
             )}
-            {st.source === "mock" && <div className="mt-3 text-center text-[12px] text-mute">Пример без нейросети: генерация сейчас недоступна</div>}
           </div>
         )}
       </div>
 
-      {st.k === "done" &&
-        (slide === 1 && current && look.k !== "error" ? (
+      {st.k === "done" && slide === 1 && current && look.k !== "error" && (
           <BottomBar>
             <div className="flex w-full flex-col gap-1">
               <Button variant="ai" className="w-full" disabled={look.k !== "ready"} onClick={addLook}>
@@ -386,18 +387,7 @@ export default function Result({ id }: { id: string }) {
               </button>
             </div>
           </BottomBar>
-        ) : (
-          <BottomBar>
-            <Button className="flex-1" onClick={addMain}>
-              В корзину{advice ? ` · ${advice.size}` : ""}
-            </Button>
-            {looks.length > 0 && (
-              <Button variant="soft" className="!bg-ai-soft !text-ai" onClick={openLook}>
-                <Sparkle size={15} /> Образ
-              </Button>
-            )}
-          </BottomBar>
-        ))}
+        )}
 
       {sheet && <TryOnSheet item={item} onClose={() => setSheet(false)} onStart={() => setSheet(false)} />}
     </div>

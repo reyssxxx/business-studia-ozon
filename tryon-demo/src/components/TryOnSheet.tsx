@@ -114,7 +114,7 @@ export default function TryOnSheet({ item, onClose, onStart }: { item: Item; onC
             <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl bg-bg2 p-3 text-[13px] leading-snug text-ink2">
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#005bff]" />
               <span>
-                Согласен на обработку фото для примерки. <b className="text-ink">Фото не сохраняется</b> и удаляется сразу после генерации.
+                Согласен отправить фото в Hugging Face для генерации примерки.
               </span>
             </label>
           </div>

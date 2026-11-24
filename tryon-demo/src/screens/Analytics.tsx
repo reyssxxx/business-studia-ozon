@@ -2,25 +2,14 @@
 import { LOOK_SKIP_LIMIT, useStore } from "../store";
 import { computeMetrics, resetEvents, useEvents } from "../lib/analytics";
 import { rub } from "../components/ui";
-import { useEffect, useState } from "react";
 
 const pct = (x: number) => `${(x * 100).toFixed(x > 0 && x < 0.1 ? 1 : 0)}%`;
-const COST_RUB = 6; // платный API ≈ $0,075 за картинку; в модели на своей GPU 1,5 ₽
 
 export default function Analytics() {
   const ev = useEvents();
   const m = computeMetrics(ev);
   const { settings, setSettings, setPerson, showToast, lookOff, setLookOff, lookSkips } = useStore();
   const uplift = m.convNoTryon > 0 ? m.convTryon / m.convNoTryon - 1 : null;
-  const [provider, setProvider] = useState<string | null>("…");
-  useEffect(() => {
-    fetch("/api/tryon")
-      .then((r) => r.json())
-      .then((d) => setProvider(d.provider ?? null))
-      .catch(() => setProvider(null));
-  }, []);
-  const providerLabel = provider === "…" ? "проверяем…" : { hf: "Открытые модели IDM-VTON и Leffa (бесплатно)", fal: "FASHN v1.6 на fal.ai", pollinations: "Запасная нейросеть FLUX.2 klein (бесплатно)", mock: "Заглушка без нейросети" }[provider ?? ""] ?? "нет связи с сервером";
-
   const cards = [
     { label: "Пользуются примеркой", sub: "доля просмотров карточки с примеркой", value: m.views ? pct(m.tryonShare) : "–", ok: m.tryonShare >= 0.05, threshold: "≥5%", base: "15%", color: "text-green" },
     {
@@ -44,8 +33,8 @@ export default function Analytics() {
       <p className="mt-1 text-[14px] text-mute">События этого демо в реальном времени. В пилоте те же метрики считаются на A/B-тесте.</p>
 
       <div className="mt-3 flex items-center gap-2 rounded-xl bg-ai-soft px-3 py-2 text-[13px] text-ink2">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${provider && provider !== "mock" ? "bg-green" : "bg-red"}`} />
-        Нейросеть: <b className="text-ink">{providerLabel}</b>
+        <span className="h-2 w-2 shrink-0 rounded-full bg-blue" />
+        <b className="text-ink">Hugging Face · IDM-VTON и Leffa</b>
       </div>
 
       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -78,10 +67,10 @@ export default function Analytics() {
           <div className="mt-1 text-[22px] font-bold">{m.avgMs ? `${(m.avgMs / 1000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} сек` : m.gensCached ? "мгновенно" : "–"}</div>
         </div>
         <div className="rounded-2xl bg-bg2 p-4">
-          <div className="text-[12px] text-mute">Стоимость генераций</div>
-          <div className="mt-1 text-[22px] font-bold">≈{rub(m.gensPaid * COST_RUB)}</div>
+          <div className="text-[12px] text-mute">Генерации</div>
+          <div className="mt-1 text-[22px] font-bold">{m.gensPaid}</div>
           <div className="text-[11px] text-mute">
-            {m.gensPaid} по {COST_RUB} ₽, из кэша бесплатно: {m.gensCached}
+            Из кэша вкладки: {m.gensCached}
           </div>
         </div>
       </div>
@@ -117,12 +106,12 @@ export default function Analytics() {
           <div className="mt-1 flex rounded-xl bg-white p-1 text-[13px] font-semibold">
             {([true, false] as const).map((live) => (
               <button key={String(live)} onClick={() => setSettings({ ...settings, liveGen: live })} className={`flex-1 rounded-lg py-2 ${settings.liveGen === live ? "bg-blue text-white" : "text-ink2"}`}>
-                {live ? "Генерировать вживую" : "Из готового кэша"}
+                {live ? "Генерировать вживую" : "Повторно из кэша"}
               </button>
             ))}
           </div>
           <div className="mt-1 text-[12px] text-mute">
-            {settings.liveGen ? "Каждая примерка создаётся заново, 15–40 секунд. Так будет у реального покупателя." : "Готовые примерки на аватаре открываются мгновенно. Удобно, если на защите нейросеть недоступна."}
+            {settings.liveGen ? "Каждая новая примерка отправляется в Hugging Face." : "Повторная примерка того же аватара и вещи берётся из кэша этой вкладки."}
           </div>
         </div>
         <div className="mt-3">
@@ -143,14 +132,6 @@ export default function Analytics() {
             )}
           </div>
         </div>
-        <label className="mt-3 block">
-          <span className="text-mute">Код доступа (если задан на сервере)</span>
-          <input
-            value={settings.accessCode}
-            onChange={(e) => setSettings({ ...settings, accessCode: e.target.value.trim() })}
-            className="mt-1 h-11 w-full rounded-xl bg-white px-3 text-ink outline-none"
-          />
-        </label>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             onClick={() => {
