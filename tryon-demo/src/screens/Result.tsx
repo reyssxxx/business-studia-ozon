@@ -14,7 +14,7 @@ import { track } from "../lib/analytics";
 import RateGeneration from "../components/RateGeneration";
 
 type State = { k: "loading" } | { k: "done"; source: string } | { k: "error"; err: TryOnError };
-type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string; preview: boolean } | { k: "error" };
+type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string; preview: boolean; degraded?: string } | { k: "error" };
 
 /** Через сколько секунд на экране результата считаем, что покупателю интересно (политика «по интересу») */
 const INTENT_DWELL_MS = 4000;
@@ -97,7 +97,7 @@ export default function Result({ id }: { id: string }) {
         if (r.source !== "cache") track({ type: "look_ready", item: id });
         shown.current = true;
       })
-      .catch(async () => {
+      .catch(async (e: Error) => {
         // Если основная картинка сама пример без нейросети, образ тоже показываем примером
         if (baseIsMock) {
           const r = await fallback(base, second);
@@ -105,7 +105,12 @@ export default function Result({ id }: { id: string }) {
             setLook({ k: "ready", image: r.image, preview: baseIsMock || r.source === "mock" });
             shown.current = true;
           }
-        } else if (alive) setLook({ k: "error" });
+        } else if (alive) {
+          // Нейросеть не надела вторую вещь (лимит, очередь, сбой). Образ остаётся рабочим: показываем
+          // основную вещь на фото, а список вещей, замену и покупку не прячем. Фото образа можно запросить ещё раз.
+          setLook({ k: "ready", image: base, preview: false, degraded: e?.message || "нейросеть не ответила" });
+          shown.current = true;
+        }
       });
     return () => {
       alive = false;
@@ -258,7 +263,7 @@ export default function Result({ id }: { id: string }) {
                     <span className="h-9 w-9 overflow-hidden rounded-full border-2 border-white/70 bg-white">
                       <img src={look.image} alt="" className="h-full w-full object-cover object-top" />
                     </span>
-                    Образ готов {Icon.chevron(14)}
+                    {look.degraded ? "Образ без фото" : "Образ готов"} {Icon.chevron(14)}
                   </button>
                 )}
                 {look.k === "loading" && (
@@ -278,10 +283,19 @@ export default function Result({ id }: { id: string }) {
                 <LookSwitcher looks={looks} idx={lookIdx} onSelect={setLookIdx} />
                 {look.k === "ready" ? (
                   <div className="fade">
-                  <BeforeAfter before={person.image} after={look.image} label="Образ на вас" preview={look.preview} />
+                  <BeforeAfter before={person.image} after={look.image} label={look.degraded ? "Основная вещь" : "Образ на вас"} preview={look.preview} />
+                  {look.degraded && second && (
+                    <div className="mt-2 rounded-xl bg-[#fff6e0] p-3 text-[13px] leading-snug text-[#7a5600]">
+                      <div className="font-semibold">Фото образа пока не получилось</div>
+                      <div className="mt-0.5">{look.degraded}. Не удалось надеть «{second.title.toLowerCase()}», поэтому на фото только основная вещь. Образ можно купить и так.</div>
+                      <button onClick={() => setAttempt((a) => a + 1)} className="mt-2 rounded-lg bg-white px-3 py-1.5 font-semibold text-ink">
+                        Попробовать ещё раз
+                      </button>
+                    </div>
+                  )}
                   {look.preview && <p className="mt-2 text-center text-[13px] text-ink2">Посадка одежды условная</p>}
                   <LookReasons look={current} />
-                  {look.k === "ready" && second && <RateGeneration target="look" item={id} imageKey={`${current.id}:${look.image.length}`} className="mt-2" />}
+                  {look.k === "ready" && second && !look.degraded && <RateGeneration target="look" item={id} imageKey={`${current.id}:${look.image.length}`} className="mt-2" />}
                   </div>
                 ) : look.k === "error" ? (
                   <div className="rounded-2xl bg-bg2 p-6 text-center">
