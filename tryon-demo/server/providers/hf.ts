@@ -3,7 +3,7 @@
 //   Leffa    — умеет низ и платья (чекпойнт dress_code), запасной вариант для верха.
 // 20–40 сек на картинку, дневная квота GPU. HF_TOKEN увеличивает квоту.
 import { Client, handle_file } from "@gradio/client";
-import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types";
+import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types.js";
 
 const clients = new Map<string, Promise<Client>>();
 function space(id: string, token?: string): Promise<Client> {
