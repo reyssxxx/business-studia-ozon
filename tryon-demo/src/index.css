@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
-/* Светлая тема в духе приложения маркетплейса: белый фон, синий акцент, зелёная цена по карте.
-   Фиолетовый градиент выделяет новую ИИ-функцию примерки. */
+/* Светлая тема в духе приложения маркетплейса: белый фон, синий акцент, зелёная цена по карте. */
 @theme {
   --font-sans: "Onest", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --color-blue: #005bff;
@@ -15,9 +14,9 @@
   --color-green: #10c44c;
   --color-green-soft: #e7f9ed;
   --color-red: #f91155;
-  --color-ai: #7b3dff;
-  --color-ai2: #c43bff;
-  --color-ai-soft: #f1ebff;
+  --color-ai: #005bff;
+  --color-ai2: #3380ff;
+  --color-ai-soft: #e5efff;
   --color-star: #ffa800;
 }
 
