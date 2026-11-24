@@ -1,4 +1,9 @@
 import { useState } from "react";
+import service0 from "../assets/catalog-service-1.png";
+import service1 from "../assets/catalog-service-2.png";
+import service2 from "../assets/catalog-service-3.png";
+import service3 from "../assets/catalog-service-4.png";
+import service4 from "../assets/catalog-service-5.png";
 import ozonLogo from "../assets/ozon.svg";
 import { byId, ITEMS, type Item } from "../data/catalog";
 import { useStore } from "../store";
@@ -91,6 +96,14 @@ export function ItemCard({ item, onClick }: { item: Item; onClick: () => void })
   );
 }
 
+const SERVICES = [
+  { label: "Каталог Ozon", image: service0 },
+  { label: "Карта Ozon Банка", image: service1 },
+  { label: "Билеты и отели", image: service2 },
+  { label: "Ozon Доставка", image: service3 },
+  { label: "Ozon Селект", image: service4 },
+];
+
 export default function Catalog() {
   const { go, results, wardrobe } = useStore();
   const [f, setF] = useState("all");
@@ -99,16 +112,25 @@ export default function Catalog() {
   const visibleItems = ITEMS.filter((item) => match(item, f) && `${item.brand} ${item.title}`.toLowerCase().includes(term));
   const triedIds = Object.keys(results);
   return (
-    <div className="pb-6">
-      <header className="sticky top-0 z-20 border-b border-blue-soft bg-white px-3 pt-3 pb-2">
-        <img src={ozonLogo} alt="OZON" className="mb-2 ml-2 block h-5 w-auto" />
+    <div className="pb-6 mvp-dark-catalog">
+      <header className="sticky top-0 z-20 mvp-catalog-top">
+        <img src={ozonLogo} alt="OZON" className="mvp-catalog-logo" />
+        <div className="ozon-demo-location">Пункт Ozon: ул. Гашека, д. 7</div>
         <label className="flex h-10 items-center gap-2 rounded-xl bg-blue-soft px-3 text-blue focus-within:ring-2 focus-within:ring-blue">
           {Icon.search(18)}
-          <input type="search" aria-label="Поиск по каталогу" placeholder="Искать в каталоге" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 text-[14px] text-ink outline-none placeholder:text-ink2" />
+          <input type="search" aria-label="Поиск по каталогу" placeholder="Искать на Ozon" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 text-[14px] text-ink outline-none placeholder:text-ink2" />
         </label>
       </header>
 
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-3 pt-3 pb-3">
+      {!term && (
+        <ul className="ozon-services" aria-label="Сервисы Ozon">
+          {SERVICES.map(({ label, image }) => (
+            <li key={label}><img src={image} alt="" /><span>{label}</span></li>
+          ))}
+        </ul>
+      )}
+
+      <div className="no-scrollbar flex gap-3 overflow-x-auto px-3 pt-3 pb-3 mvp-catalog-filters">
         {CIRCLES.map((c) => (
           <button key={c.label} onClick={() => setF(c.f)} className="flex w-[64px] shrink-0 flex-col items-center gap-1">
             <div className={`h-[60px] w-[60px] overflow-hidden rounded-full p-[2px] ${c.ai ? "ai-grad" : "bg-line"}`}>
