@@ -101,7 +101,7 @@ export default function App() {
         </div>
       </aside>
 
-      <div className="relative flex h-dvh w-full flex-col overflow-hidden bg-white sm:h-[860px] sm:max-h-[calc(100dvh-48px)] sm:w-[400px] sm:rounded-[46px] sm:border-[11px] sm:border-[#11161c] sm:shadow-[0_30px_80px_rgba(0,26,52,.25)]">
+      <div className="relative flex h-dvh min-w-0 w-full max-w-full flex-col overflow-hidden bg-white pt-[env(safe-area-inset-top)] sm:h-[860px] sm:max-h-[calc(100dvh-48px)] sm:w-[400px] sm:pt-0 sm:rounded-[46px] sm:border-[11px] sm:border-[#11161c] sm:shadow-[0_30px_80px_rgba(0,26,52,.25)]">
         <div ref={scroller} className="no-scrollbar relative flex-1 overflow-y-auto">
           <Screen />
         </div>
