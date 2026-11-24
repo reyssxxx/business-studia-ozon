@@ -2,11 +2,11 @@
 //   GET  /api/tryon → какой провайдер активен
 //   POST /api/tryon → { personImage, garmentImage, category, description? } → { ok, image }
 // Фото покупателя нигде не сохраняется: приходит в теле запроса и сразу уходит в модель.
-import { cacheGet, cacheKey, cachePut } from "./cache";
-import { fal } from "./providers/fal";
-import { hf } from "./providers/hf";
-import { pollinations } from "./providers/pollinations";
-import { ProviderError, type Env, type Provider, type ProviderId, type TryOnInput } from "./providers/types";
+import { cacheGet, cacheKey, cachePut } from "./cache.js";
+import { fal } from "./providers/fal.js";
+import { hf } from "./providers/hf.js";
+import { pollinations } from "./providers/pollinations.js";
+import { ProviderError, type Env, type Provider, type ProviderId, type TryOnInput } from "./providers/types.js";
 
 export interface TryOnResponse {
   ok: boolean;
