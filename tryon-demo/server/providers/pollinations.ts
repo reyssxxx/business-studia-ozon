@@ -2,7 +2,7 @@
 // Это не специальная модель примерки, а общий редактор: он получает фото человека и фото вещи
 // и по текстовой инструкции «надевает» вещь. Качество ниже, чем у IDM-VTON и FASHN,
 // зато лимит не связан с Hugging Face. Нужен бесплатный ключ: https://enter.pollinations.ai/keys
-import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types";
+import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types.js";
 
 const ENDPOINT = "https://gen.pollinations.ai/v1/images/edits";
 const MODEL = "black-forest-labs/flux.2-klein-4b";

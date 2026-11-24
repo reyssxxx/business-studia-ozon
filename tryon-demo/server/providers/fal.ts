@@ -1,5 +1,5 @@
 // Платный провайдер: FASHN Virtual Try-On v1.6 на fal.ai. ≈$0,075 за картинку, 6–15 сек.
-import { ProviderError, urlToDataUri, type Provider } from "./types";
+import { ProviderError, urlToDataUri, type Provider } from "./types.js";
 
 const ENDPOINT = "https://fal.run/fal-ai/fashn/tryon/v1.6";
 

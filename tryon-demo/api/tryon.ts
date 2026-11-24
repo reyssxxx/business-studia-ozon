@@ -1,5 +1,5 @@
 // Функция Vercel: POST /api/tryon
-import { handleTryOn } from "../server/tryon";
+import { handleTryOn } from "../server/tryon.js";
 
 export const config = { maxDuration: 300 };
 
