@@ -4,6 +4,7 @@
 // 20–40 сек на картинку, дневная квота GPU. HF_TOKEN увеличивает квоту.
 import { Client, handle_file } from "@gradio/client";
 import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types.js";
+import { maskFor } from "./mask.js";
 
 const clients = new Map<string, Promise<Client>>();
 function space(id: string, token?: string): Promise<Client> {
@@ -27,11 +28,13 @@ function wrap(e: unknown): ProviderError {
 
 async function idmVton(b: TryOnInput, token?: string): Promise<string> {
   const c = await space("yisol/IDM-VTON", token);
+  // Верх: автомаска по позе. Низ и платья: своя маска (автомаска у этой модели только на верх).
+  const mask = maskFor(b.category);
   const r = await c.predict("/tryon", {
-    dict: { background: handle_file(toBlob(b.personImage)), layers: [], composite: null },
+    dict: { background: handle_file(toBlob(b.personImage)), layers: mask ? [handle_file(mask)] : [], composite: null },
     garm_img: handle_file(toBlob(b.garmentImage)),
     garment_des: b.description || "clothing",
-    is_checked: true, // автомаска по позе
+    is_checked: !mask,
     is_checked_crop: false,
     denoise_steps: 30,
     seed: 42,
@@ -57,7 +60,10 @@ async function leffa(b: TryOnInput, token?: string): Promise<string> {
 
 export const hf: Provider = async (b, env) => {
   const token = env.HF_TOKEN || undefined;
-  const chain = b.category === "tops" ? [idmVton, leffa] : [leffa];
+  // IDM-VTON заказывает у Hugging Face около 60 секунд GPU, Leffa 120 и больше. Поэтому IDM-VTON идёт первой для всех
+  // категорий: на бесплатном аккаунте её хватает надолго, а Leffa остаётся запасной. HF_LOWER_MODEL=leffa вернёт старый порядок.
+  const lowerFirstLeffa = env.HF_LOWER_MODEL === "leffa" && b.category !== "tops";
+  const chain = lowerFirstLeffa ? [leffa, idmVton] : [idmVton, leffa];
   let last: ProviderError | null = null;
   for (const model of chain) {
     try {
