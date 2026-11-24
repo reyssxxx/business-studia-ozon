@@ -74,7 +74,6 @@ export default function App() {
 
   return (
     <main className={`demo-stage ${modelOpen ? "demo-stage-open" : "demo-stage-start"}`}>
-      <div className="demo-glass-wordmark" aria-hidden="true">OZON</div>
       <section className="demo-intro" aria-labelledby="demo-title">
         <header className="demo-heading" inert={!modelOpen}>
           <span className="demo-mark"><Sparkle size={20} /></span>

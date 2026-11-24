@@ -375,54 +375,7 @@ button {
   .demo-metrics { padding-block: 10px; }
 }
 
-.demo-glass-wordmark { display: none; }
 .demo-mobile-pilot { display: none; }
-
-@media (min-width: 720px) and (min-height: 540px) {
-  .demo-glass-wordmark {
-    position: absolute;
-    z-index: -1;
-    display: block;
-    left: 50%;
-    top: 50%;
-    width: max-content;
-    transform: translate(-50%, -50%) perspective(1400px) rotateX(16deg) scaleX(1.12);
-    font: 900 clamp(160px, 23.5vw, 422px)/.98 "Arial Rounded MT Bold", "Arial Black", system-ui, sans-serif;
-    letter-spacing: -.075em;
-    color: transparent;
-    -webkit-text-stroke: 2px transparent;
-    isolation: isolate;
-    user-select: none;
-    pointer-events: none;
-  }
-
-  .demo-glass-wordmark::before,
-  .demo-glass-wordmark::after {
-    content: "OZON";
-    position: absolute;
-    inset: 0;
-    color: transparent;
-    background-clip: text;
-    -webkit-background-clip: text;
-  }
-
-  .demo-glass-wordmark::before {
-    z-index: -1;
-    transform: translateY(.035em);
-    -webkit-text-stroke: .038em #0b2a81a3;
-    background-image: linear-gradient(180deg, #92caff65 15%, #315ac660 55%, #091e6577 90%);
-    filter: drop-shadow(0 .045em .06em #06194e88);
-  }
-
-  .demo-glass-wordmark::after {
-    -webkit-text-stroke: .012em #b8deff70;
-    background-image:
-      radial-gradient(ellipse at 23% 18%, #f1fbffbd, #c6eaff16 47%, transparent 62%),
-      radial-gradient(ellipse at 82% 76%, #69c2ff82, transparent 53%),
-      linear-gradient(180deg, #f0fbffbd 6%, #a6dbff64 18%, #61a2f039 34%, #2250b961 56%, #7fbaff6b 77%, #dcf3ffb0 91%, #83b9ff58 100%);
-    filter: drop-shadow(0 -.007em .009em #f2fcff80) drop-shadow(0 .012em .012em #1542a699);
-  }
-}
 
 @media (width < 720px), (height < 540px) {
   .demo-mobile-pilot {
