@@ -6,11 +6,12 @@ import { LOOK_SKIP_LIMIT, useStore } from "../store";
 import { BottomBar, Button, cardPrice, Header, Icon, rub, Sparkle } from "../components/ui";
 import { BeforeAfter, Generating } from "../components/TryOnView";
 import TryOnSheet from "../components/TryOnSheet";
-import { LookItems, LookReasons, LookSwitcher, lookPrice, sizeOf, useLooks } from "../components/LookEditor";
+import { LookItems, LookReasons, LookSwitcher, ModeSwitch, ProfileChip, lookPrice, sizeOf, useLooks } from "../components/LookEditor";
 import { visualItem } from "../lib/stylist";
 import { recommendSize } from "../lib/size";
 import { fallback, tryOn, TryOnError } from "../lib/tryon";
 import { track } from "../lib/analytics";
+import RateGeneration from "../components/RateGeneration";
 
 type State = { k: "loading" } | { k: "done"; source: string } | { k: "error"; err: TryOnError };
 type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string; preview: boolean } | { k: "error" };
@@ -54,7 +55,6 @@ export default function Result({ id }: { id: string }) {
   const [look, setLook] = useState<LookState>({ k: "idle" });
   const [wanted, setWanted] = useState(false); // пора ли собирать образ
   const [attempt, setAttempt] = useState(0);
-  const [vote, setVote] = useState<"up" | "down" | null>(null);
   const viewed = useRef(false);
   const shown = useRef(false);
 
@@ -176,7 +176,7 @@ export default function Result({ id }: { id: string }) {
   };
   const addLook = () => {
     lookItems.forEach((it) => addToCart({ id: it.id, size: sizeOf(it, body), source: it.id === id ? "tryon" : "look" }));
-    track({ type: "look_add", item: id, price: lookTotal });
+    track({ type: "look_add", item: id, price: lookTotal, lookMode: current?.mode });
     showToast(`Образ в корзине · ${rub(lookTotal)}`);
     tab({ name: "cart" });
   };
@@ -273,12 +273,15 @@ export default function Result({ id }: { id: string }) {
             {/* слайд 2: образ */}
             {slide === 1 && current && (
               <>
+                <ModeSwitch />
+                <ProfileChip />
                 <LookSwitcher looks={looks} idx={lookIdx} onSelect={setLookIdx} />
                 {look.k === "ready" ? (
                   <div className="fade">
                   <BeforeAfter before={person.image} after={look.image} label="Образ на вас" preview={look.preview} />
                   {look.preview && <p className="mt-2 text-center text-[13px] text-ink2">Посадка одежды условная</p>}
                   <LookReasons look={current} />
+                  {look.k === "ready" && second && <RateGeneration target="look" item={id} imageKey={`${current.id}:${look.image.length}`} className="mt-2" />}
                   </div>
                 ) : look.k === "error" ? (
                   <div className="rounded-2xl bg-bg2 p-6 text-center">
@@ -339,26 +342,7 @@ export default function Result({ id }: { id: string }) {
                   </div>
                 </div>
                 {/* оценка качества: сигнал для Ozon, насколько примерке можно верить */}
-                {st.source !== "mock" && (
-                  <div className="mt-2 flex items-center justify-between rounded-2xl border border-line px-3 py-2">
-                    <span className="text-[14px] text-ink2">{vote ? "Спасибо, учтём" : "Похоже на правду?"}</span>
-                    <span className="flex gap-1.5">
-                      {(["up", "down"] as const).map((v) => (
-                        <button
-                          key={v}
-                          disabled={!!vote}
-                          onClick={() => {
-                            setVote(v);
-                            track({ type: v === "up" ? "vote_up" : "vote_down", item: id });
-                          }}
-                          className={`grid h-9 w-11 place-items-center rounded-xl text-[17px] transition ${vote === v ? "bg-blue-soft" : "bg-bg2"} ${vote && vote !== v ? "opacity-30" : ""}`}
-                        >
-                          {v === "up" ? "👍" : "👎"}
-                        </button>
-                      ))}
-                    </span>
-                  </div>
-                )}
+                {st.source !== "mock" && <RateGeneration target="tryon" item={id} imageKey={String(base.length)} className="mt-2" />}
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <Button variant="white" size="md" className="!px-2 !text-[13px]" onClick={() => setSheet(true)}>
                     Другое фото

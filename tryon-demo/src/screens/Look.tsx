@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { byId } from "../data/catalog";
 import { useStore } from "../store";
 import { BottomBar, Button, Header, rub, Sparkle } from "../components/ui";
-import { LookItems, LookReasons, LookSwitcher, lookPrice, sizeOf, useLooks } from "../components/LookEditor";
+import { LookItems, LookReasons, LookSwitcher, ModeSwitch, ProfileChip, lookPrice, sizeOf, useLooks } from "../components/LookEditor";
 import type { Look as LookT } from "../lib/stylist";
 import { track } from "../lib/analytics";
 
@@ -51,6 +51,8 @@ export default function Look({ id }: { id: string }) {
     <div className="pb-6">
       <Header title="Собрать образ" />
       <div className="px-4 pt-2">
+        <ModeSwitch />
+        <ProfileChip />
         <LookSwitcher looks={looks} idx={idx} onSelect={setIdx} />
         {results[id] ? (
           <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-bg2">
@@ -77,7 +79,7 @@ export default function Look({ id }: { id: string }) {
           className="w-full"
           onClick={() => {
             buy.forEach((x) => addToCart({ id: x.item.id, size: sizeOf(x.item, body), source: x.item.id === id ? (results[id] ? "tryon" : "product") : "look" }));
-            track({ type: "look_add", item: id, price: total });
+            track({ type: "look_add", item: id, price: total, lookMode: look.mode });
             showToast(`Образ в корзине · ${rub(total)}`);
             tab({ name: "cart" });
           }}

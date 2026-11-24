@@ -2,7 +2,9 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import type { Body } from "./lib/size";
 import { load, save } from "./lib/storage";
 import { byId } from "./data/catalog";
-import { track } from "./lib/analytics";
+import { personaById, type Owned, type PersonaId } from "./data/personas";
+import type { PhotoStyle, StyleShares } from "./lib/profile";
+import { track, type Reason } from "./lib/analytics";
 
 export type Route =
   | { name: "catalog" }
@@ -34,25 +36,19 @@ export interface Settings {
 /** После стольких проигнорированных подряд образов перестаём собирать их сами */
 export const LOOK_SKIP_LIMIT = 3;
 
-/** Вещь в гардеробе покупателя */
-export interface Owned {
-  id: string;
-  /** order: из истории заказов; manual: покупатель отметил сам */
-  source: "order" | "manual";
-  /** дата заказа для подписи */
-  date?: string;
+export type { Owned } from "./data/personas";
+export type LookMode = "for-you" | "new";
+export interface Rating {
+  vote: "up" | "down";
+  reason?: Reason;
 }
-
-// Демо: в «истории заказов» уже есть джинсы и кеды, чтобы был виден подбор с вашими вещами
-const WARDROBE_SEED: Owned[] = [
-  { id: "jeans", source: "order", date: "12 октября" },
-  { id: "sneakers", source: "order", date: "3 сентября" },
-];
 
 export interface Person {
   /** Что отправляем в API: фото покупателя или аватар */
   image: string;
   mode: "photo" | "avatar";
+  /** Стиль одежды на фото: определяет нейросеть, пока идёт примерка */
+  style?: PhotoStyle;
 }
 
 interface Store {
@@ -79,6 +75,18 @@ interface Store {
   toggleFav: (id: string) => void;
   wardrobe: Owned[];
   toggleOwned: (id: string) => void;
+  persona: PersonaId;
+  setPersona: (id: PersonaId) => void;
+  /** Стиль на фото покупателя, не сбрасывая результаты примерок */
+  setPersonStyle: (s: PhotoStyle) => void;
+  /** Доли стилей, которые покупатель выставил сам. null: считаем автоматически */
+  styleOverride: StyleShares | null;
+  setStyleOverride: (s: StyleShares | null) => void;
+  lookMode: LookMode;
+  setLookMode: (m: LookMode) => void;
+  /** оценки сгенерированных картинок за сессию: ключ «что:вещь:картинка» */
+  ratings: Record<string, Rating>;
+  rate: (key: string, r: Rating) => void;
   /** покупатель отключил автоподбор образов */
   lookOff: boolean;
   setLookOff: (v: boolean) => void;
@@ -106,14 +114,35 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const [wardrobe, setWardrobe] = useState<Owned[]>(() => load("tryon.wardrobe.v1", WARDROBE_SEED));
+  const [persona, setPersonaState] = useState<PersonaId>(() => load("tryon.persona.v1", "casual" as PersonaId));
+  const [wardrobe, setWardrobe] = useState<Owned[]>(() => load<Owned[] | null>("tryon.wardrobe.v2", null) ?? personaById(load("tryon.persona.v1", "casual" as PersonaId)).wardrobe);
   const toggleOwned = useCallback((id: string) => {
     setWardrobe((w) => {
-      const next = w.some((x) => x.id === id) ? w.filter((x) => x.id !== id) : [...w, { id, source: "manual" as const }];
-      save("tryon.wardrobe.v1", next);
+      const next = w.some((x) => x.id === id) ? w.filter((x) => x.id !== id) : [...w, { id, source: "manual" as const, daysAgo: 0 }];
+      save("tryon.wardrobe.v2", next);
       return next;
     });
   }, []);
+  // Смена покупателя в демо подставляет его историю заказов
+  const setPersona = useCallback((id: PersonaId) => {
+    setPersonaState(id);
+    save("tryon.persona.v1", id);
+    const next = personaById(id).wardrobe;
+    setWardrobe(next);
+    save("tryon.wardrobe.v2", next);
+    setStyleOverrideState(null);
+    save("tryon.styleOverride.v1", null);
+  }, []);
+  const [styleOverride, setStyleOverrideState] = useState<StyleShares | null>(() => load<StyleShares | null>("tryon.styleOverride.v1", null));
+  const setStyleOverride = useCallback((v: StyleShares | null) => {
+    setStyleOverrideState(v);
+    save("tryon.styleOverride.v1", v);
+  }, []);
+  const [ratings, setRatings] = useState<Record<string, Rating>>({});
+  const rate = useCallback((key: string, r: Rating) => setRatings((x) => ({ ...x, [key]: r })), []);
+  const [lookMode, setLookModeState] = useState<LookMode>("for-you");
+  const setLookMode = useCallback((m: LookMode) => setLookModeState(m), []);
+  const setPersonStyle = useCallback((style: PhotoStyle) => setPerson((p) => (p ? { ...p, style } : p)), []);
   const [lookOff, setLookOffState] = useState<boolean>(() => load("tryon.lookOff", false));
   const [lookSkips, setLookSkips] = useState<number>(() => load("tryon.lookSkips", 0));
   const setLookOff = useCallback((v: boolean) => {
@@ -205,12 +234,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       toggleFav,
       wardrobe,
       toggleOwned,
+      persona,
+      setPersona,
+      setPersonStyle,
+      styleOverride,
+      setStyleOverride,
+      lookMode,
+      setLookMode,
+      ratings,
+      rate,
       lookOff,
       setLookOff,
       lookSkips,
       noteLook,
     }),
-    [stack, go, back, tab, cart, addToCart, removeFromCart, body, person, results, settings, toast, showToast, favs, toggleFav, wardrobe, toggleOwned, lookOff, setLookOff, lookSkips, noteLook],
+    [stack, go, back, tab, cart, addToCart, removeFromCart, body, person, results, settings, toast, showToast, favs, toggleFav, wardrobe, toggleOwned, persona, setPersona, setPersonStyle, styleOverride, setStyleOverride, lookMode, setLookMode, ratings, rate, lookOff, setLookOff, lookSkips, noteLook],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -1,5 +1,6 @@
 // «Аналитика пилота»: те же метрики и пороги, что на слайде пилота в презентации.
 import { LOOK_SKIP_LIMIT, useStore } from "../store";
+import { PERSONAS } from "../data/personas";
 import { computeMetrics, resetEvents, useEvents } from "../lib/analytics";
 import { rub } from "../components/ui";
 
@@ -8,7 +9,7 @@ const pct = (x: number) => `${(x * 100).toFixed(x > 0 && x < 0.1 ? 1 : 0)}%`;
 export default function Analytics() {
   const ev = useEvents();
   const m = computeMetrics(ev);
-  const { settings, setSettings, setPerson, showToast, lookOff, setLookOff, lookSkips } = useStore();
+  const { settings, setSettings, setPerson, showToast, lookOff, setLookOff, lookSkips, persona, setPersona } = useStore();
   const uplift = m.convNoTryon > 0 ? m.convTryon / m.convNoTryon - 1 : null;
   const cards = [
     { label: "Пользуются примеркой", sub: "доля просмотров карточки с примеркой", value: m.views ? pct(m.tryonShare) : "–", ok: m.tryonShare >= 0.05, threshold: "≥5%", base: "15%", color: "text-green" },
@@ -23,6 +24,7 @@ export default function Analytics() {
       base: "+12%",
       color: "text-blue",
     },
+    { label: "Открыли «Что-то новое»", sub: m.newAdds ? `из него добавили в корзину: ${m.newAdds}` : "режим непривычных образов", value: String(m.newOpened), ok: m.newOpened > 0, threshold: "нет, смотрим динамику", base: "–", color: "text-ai" },
     { label: "Собрали образ", sub: m.lookShown ? `образ предложен ${m.lookShown} раз, открыт ${m.lookViews}` : "на 100 примеривших", value: m.tryons ? pct(m.lookRate) : "–", ok: m.lookRate >= 0.04, threshold: "≥4%", base: "6%", color: "text-ai" },
   ];
 
@@ -75,13 +77,36 @@ export default function Analytics() {
         </div>
       </div>
       <div className="mt-2 rounded-2xl bg-bg2 p-4">
-        <div className="text-[12px] text-mute">Качество примерки по оценкам покупателей</div>
+        <div className="text-[12px] text-mute">Качество генерации по оценкам покупателей</div>
         <div className="mt-1 text-[22px] font-bold">
-          {m.votesUp + m.votesDown ? `${Math.round((m.votesUp / (m.votesUp + m.votesDown)) * 100)}% «похоже на правду»` : "–"}
+          {m.votesUp + m.votesDown ? `${Math.round((m.votesUp / (m.votesUp + m.votesDown)) * 100)}% 👍` : "–"}
         </div>
-        <div className="text-[11px] text-mute">
-          👍 {m.votesUp} · 👎 {m.votesDown}. В пилоте это защитная метрика: если доля падает, растут возвраты и жалобы.
-        </div>
+        <div className="text-[11px] text-mute">👍 {m.votesUp} · 👎 {m.votesDown}. Защитная метрика пилота: если доля падает, растут возвраты и жалобы.</div>
+        {m.votesUp + m.votesDown > 0 && (
+          <div className="mt-3 space-y-1.5 text-[13px]">
+            {([["tryon", "Примерка вещи"], ["look", "Образ целиком"]] as const).map(([k, label]) => {
+              const v = m.votesByTarget[k];
+              const n = v.up + v.down;
+              return (
+                <div key={k} className="flex justify-between">
+                  <span className="text-ink2">{label}</span>
+                  <span className="font-semibold">{n ? `${Math.round((v.up / n) * 100)}% 👍 · ${n}` : "–"}</span>
+                </div>
+              );
+            })}
+            {m.votesDown > 0 && (
+              <div className="border-t border-line pt-2">
+                <div className="mb-1 text-[12px] text-mute">Почему 👎</div>
+                {([["not_me", "Не похоже на меня"], ["garment", "Вещь выглядит иначе"], ["artifacts", "Странности на фото"], ["fit", "Не так сидит"]] as const).map(([k, label]) => (
+                  <div key={k} className="flex justify-between">
+                    <span className="text-ink2">{label}</span>
+                    <span className="font-semibold">{m.reasons[k]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="mt-2 rounded-2xl bg-bg2 p-4">
         <div className="text-[12px] text-mute">Сумма корзин</div>
@@ -90,6 +115,18 @@ export default function Analytics() {
 
       <details className="mt-6 rounded-2xl bg-bg2 p-4 text-[14px]">
         <summary className="cursor-pointer font-semibold text-ink2">Настройки демо</summary>
+        <div className="mt-4">
+          <span className="text-mute">Покупатель (история заказов)</span>
+          <div className="mt-1 grid grid-cols-2 gap-1.5">
+            {PERSONAS.map((p) => (
+              <button key={p.id} onClick={() => { setPersona(p.id); showToast(`Покупатель: ${p.label}`); }} className={`rounded-xl px-3 py-2 text-left text-[13px] ${persona === p.id ? "bg-blue text-white" : "bg-white text-ink2"}`}>
+                <span className="block font-semibold">{p.label}</span>
+                <span className={persona === p.id ? "text-white/80" : "text-mute"}>{p.hint}</span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 text-[12px] text-mute">Меняет гардероб и профиль стиля, а с ними образы «Для вас» и «Что-то новое».</div>
+        </div>
         <label className="mt-4 block">
           <span className="text-mute">Таймаут живой генерации, сек</span>
           <input

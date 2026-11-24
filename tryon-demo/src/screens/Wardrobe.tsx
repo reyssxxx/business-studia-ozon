@@ -1,6 +1,7 @@
 // Мой гардероб: вещи, которые у покупателя уже есть. Стилист собирает образы с ними,
 // а в корзину кладёт только недостающее. В проде гардероб наполняется из истории заказов сам.
 import { ITEMS, SLOT_LABEL, byId, type Slot } from "../data/catalog";
+import { dateLabel } from "../data/personas";
 import { useStore } from "../store";
 import { Header, Icon, Sparkle } from "../components/ui";
 
@@ -38,7 +39,7 @@ export default function Wardrobe() {
                       <img src={it.image} alt="" className="h-full w-full object-cover" />
                     </div>
                     <div className="mt-1 truncate text-[12px] font-medium">{it.title}</div>
-                    <div className="text-[11px] text-mute">{w.source === "order" ? `Заказ ${w.date}` : "Добавлено вами"}</div>
+                    <div className="text-[11px] text-mute">{w.source === "order" ? `Заказ: ${dateLabel(w.daysAgo)}` : "Добавлено вами"}</div>
                   </button>
                   <button onClick={() => toggleOwned(w.id)} aria-label="Убрать из гардероба" className="absolute top-1 right-1 grid h-7 w-7 place-items-center rounded-full bg-white/85 text-ink2 shadow">
                     {Icon.close(12)}

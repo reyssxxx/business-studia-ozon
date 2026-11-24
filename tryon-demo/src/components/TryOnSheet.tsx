@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import type { Item } from "../data/catalog";
 import { useStore } from "../store";
 import { Button, Icon, Sheet, Sparkle } from "./ui";
+import { analyzeStyle } from "../lib/style";
 import { avatarFor, type Gender } from "../lib/size";
 import { fileToDataUrl, urlToDataUrl } from "../lib/image";
 
@@ -9,7 +10,7 @@ type Mode = "photo" | "avatar";
 
 /** Шторка запуска примерки: фото или рост/вес, согласие, параметры для размера. */
 export default function TryOnSheet({ item, onClose, onStart }: { item: Item; onClose: () => void; onStart: () => void }) {
-  const { body, setBody, person, setPerson, showToast } = useStore();
+  const { body, setBody, person, setPerson, setPersonStyle, settings, showToast } = useStore();
   const [mode, setMode] = useState<Mode>(person?.mode ?? "photo");
   const [photo, setPhoto] = useState<string | null>(person?.mode === "photo" ? person.image : null);
   const [consent, setConsent] = useState(person?.mode === "photo");
@@ -35,7 +36,11 @@ export default function TryOnSheet({ item, onClose, onStart }: { item: Item; onC
     setBusy(true);
     try {
       const image = mode === "photo" ? photo! : await urlToDataUrl(avatarFor(body));
-      if (image !== person?.image) setPerson({ image, mode });
+      if (image !== person?.image) {
+        setPerson({ image, mode });
+        // стиль одежды на фото определяем параллельно с примеркой, на её скорость это не влияет
+        if (mode === "photo") analyzeStyle(image, settings.accessCode).then((st) => st && setPersonStyle(st));
+      }
       onStart();
     } catch {
       showToast("Не получилось подготовить фото");

@@ -5,11 +5,20 @@ import { useStore } from "../store";
 import { addableSlots, alternatives, buildLooks, currentSeason, editLook, type Look, type StylistCtx } from "../lib/stylist";
 import { recommendSize } from "../lib/size";
 import { cardPrice, Icon, rub, Sheet, Sparkle } from "./ui";
-import { track } from "../lib/analytics";
+import { track, useEvents } from "../lib/analytics";
+import { buildProfile, sourcesText, STYLES, topStyles, type Profile } from "../lib/profile";
+import { STYLE_LABEL, type Style } from "../data/catalog";
 
+/** Контекст стилиста: фигура, гардероб, профиль стиля и режим («Для вас» / «Что-то новое») */
 export function useStylistCtx(): StylistCtx {
-  const { body, wardrobe } = useStore();
-  return useMemo(() => ({ gender: body.gender, owned: new Set(wardrobe.map((w) => w.id)), now: currentSeason() }), [body.gender, wardrobe]);
+  const { body, wardrobe, person, styleOverride, lookMode } = useStore();
+  const events = useEvents();
+  // действия в сессии берём на момент открытия экрана: образ не должен меняться на глазах во время генерации
+  const [seen] = useState(events);
+  return useMemo(() => {
+    const profile = buildProfile({ photo: person?.style, wardrobe, events: seen, override: styleOverride });
+    return { gender: body.gender, owned: new Set(wardrobe.map((w) => w.id)), now: currentSeason(), profile, mode: lookMode };
+  }, [body.gender, wardrobe, person?.style, styleOverride, lookMode, seen]);
 }
 
 /** Образы к вещи и правки покупателя. Правки живут, пока открыт экран. */
@@ -226,6 +235,83 @@ function PickerSheet({ title, items, ctx, look, onPick, onClose }: { title: stri
             <Sparkle size={12} />
           </span>
           Показываем только то, что подходит по сезону и цвету к остальным вещам образа.
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Переключатель «Для вас» / «Что-то новое» */
+export function ModeSwitch() {
+  const { lookMode, setLookMode } = useStore();
+  const set = (m: "for-you" | "new") => {
+    if (m === lookMode) return;
+    setLookMode(m);
+    if (m === "new") track({ type: "mode_new" });
+  };
+  return (
+    <div className="mb-2 flex rounded-xl bg-bg2 p-1 text-[14px] font-semibold" role="tablist" aria-label="Режим подбора образов">
+      <button role="tab" aria-selected={lookMode === "for-you"} onClick={() => set("for-you")} className={`flex-1 rounded-[10px] px-2 py-2 transition ${lookMode === "for-you" ? "bg-white text-ink shadow-sm" : "text-mute"}`}>
+        Для вас
+      </button>
+      <button role="tab" aria-selected={lookMode === "new"} onClick={() => set("new")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2 py-2 transition ${lookMode === "new" ? "bg-white shadow-sm" : ""}`}>
+        <span className={lookMode === "new" ? "ai-text flex items-center gap-1" : "flex items-center gap-1 text-mute"}>
+          <Sparkle size={13} /> Что-то новое
+        </span>
+      </button>
+    </div>
+  );
+}
+
+/** Плашка «Ваш стиль»: показывает профиль и открывает ползунки, чтобы поправить */
+export function ProfileChip() {
+  const { styleOverride, setStyleOverride } = useStore();
+  const ctx = useStylistCtx();
+  const [open, setOpen] = useState(false);
+  const p = ctx.profile;
+  if (!p) return null;
+  return (
+    <>
+      <button onClick={() => setOpen(true)} className="mb-2 flex w-full items-center gap-2 rounded-xl border border-line px-3 py-2 text-left">
+        <span className="text-ai">
+          <Sparkle size={14} />
+        </span>
+        <span className="min-w-0 flex-1 text-[13px] leading-tight">
+          <span className="block truncate font-semibold">Ваш стиль: {topStyles(p)}</span>
+          <span className="block truncate text-mute">{sourcesText(p)}</span>
+        </span>
+        <span className="text-[13px] font-medium text-blue">Изменить</span>
+      </button>
+      {open && <ProfileSheet profile={p} onClose={() => setOpen(false)} onSave={(v) => { setStyleOverride(v); setOpen(false); }} onReset={styleOverride ? () => { setStyleOverride(null); setOpen(false); } : undefined} />}
+    </>
+  );
+}
+
+function ProfileSheet({ profile, onClose, onSave, onReset }: { profile: Profile; onClose: () => void; onSave: (v: Record<Style, number>) => void; onReset?: () => void }) {
+  const [v, setV] = useState<Record<Style, number>>(() => Object.fromEntries(STYLES.map((s) => [s, Math.round(profile.styles[s] * 100)])) as Record<Style, number>);
+  const sum = STYLES.reduce((a, s) => a + v[s], 0) || 1;
+  return (
+    <Sheet title="Ваш стиль" onClose={onClose}>
+      <div className="px-4 pb-2">
+        <div className="text-[13px] leading-snug text-mute">Мы определили стиль по фото, покупкам и вашим действиям. Если не угадали, поправьте: образы подстроятся.</div>
+        <div className="mt-3 space-y-3">
+          {STYLES.map((s) => (
+            <label key={s} className="block">
+              <div className="flex justify-between text-[14px]">
+                <span>{STYLE_LABEL[s]}</span>
+                <span className="font-semibold">{Math.round((v[s] / sum) * 100)}%</span>
+              </div>
+              <input type="range" min={0} max={100} value={v[s]} onChange={(e) => setV({ ...v, [s]: Number(e.target.value) })} className="mt-1 w-full accent-[#005bff]" />
+            </label>
+          ))}
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button onClick={() => onSave(v)} className="h-11 rounded-xl bg-blue text-[15px] font-semibold text-white">
+            Сохранить
+          </button>
+          <button onClick={onReset ?? onClose} className="h-11 rounded-xl bg-bg2 text-[15px] font-semibold text-ink">
+            {onReset ? "Вернуть авто" : "Отмена"}
+          </button>
         </div>
       </div>
     </Sheet>

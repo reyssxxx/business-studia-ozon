@@ -13,12 +13,16 @@ export type EventType =
   | "look_view" // покупатель открыл слайд с образом
   | "look_off" // покупатель отключил автоподбор образов
   | "look_switch" // переключил образ
+  | "mode_new" // открыл «Что-то новое»
   | "look_edit" // заменил, убрал или добавил вещь в образе
   | "gen" // одна картинка от нейросети (cached: взята из кэша, бесплатно)
   | "vote_up" // «похоже на правду»
   | "vote_down"
+  | "vote_reason" // причина дизлайка
   | "share"
   | "look_add";
+
+export type Reason = "not_me" | "garment" | "artifacts" | "fit";
 
 export interface Ev {
   t: number;
@@ -30,6 +34,12 @@ export interface Ev {
   ms?: number;
   mode?: "photo" | "avatar";
   cached?: boolean;
+  /** из какого режима образ добавили в корзину */
+  lookMode?: "for-you" | "new";
+  /** что оценивали: примерку одной вещи или образ целиком */
+  target?: "tryon" | "look";
+  /** причина дизлайка */
+  reason?: Reason;
 }
 
 const KEY = "tryon.events.v1";
@@ -69,6 +79,10 @@ export interface Metrics {
   gensCached: number; // картинки из кэша
   votesUp: number;
   votesDown: number;
+  votesByTarget: Record<"tryon" | "look", { up: number; down: number }>;
+  reasons: Record<Reason, number>;
+  newOpened: number; // сколько раз открыли «Что-то новое»
+  newAdds: number; // сколько образов из него добавили
   lookShown: number; // сколько раз образ был предложен
   lookViews: number; // сколько раз его открыли
   lookAdds: number;
@@ -97,6 +111,18 @@ export function computeMetrics(ev: Ev[]): Metrics {
     gensCached: count("gen", (e) => !!e.cached),
     votesUp: count("vote_up"),
     votesDown: count("vote_down"),
+    votesByTarget: {
+      tryon: { up: count("vote_up", (e) => e.target !== "look"), down: count("vote_down", (e) => e.target !== "look") },
+      look: { up: count("vote_up", (e) => e.target === "look"), down: count("vote_down", (e) => e.target === "look") },
+    },
+    reasons: {
+      not_me: count("vote_reason", (e) => e.reason === "not_me"),
+      garment: count("vote_reason", (e) => e.reason === "garment"),
+      artifacts: count("vote_reason", (e) => e.reason === "artifacts"),
+      fit: count("vote_reason", (e) => e.reason === "fit"),
+    },
+    newOpened: count("mode_new"),
+    newAdds: count("look_add", (e) => e.lookMode === "new"),
     lookShown: count("look_ready"),
     lookViews: count("look_view"),
     lookAdds,
