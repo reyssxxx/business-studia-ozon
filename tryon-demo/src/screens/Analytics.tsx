@@ -3,6 +3,7 @@ import { LOOK_SKIP_LIMIT, useStore } from "../store";
 import { PERSONAS } from "../data/personas";
 import { computeMetrics, resetEvents, useEvents } from "../lib/analytics";
 import { rub } from "../components/ui";
+import PaidControl from "../components/PaidControl";
 
 const pct = (x: number) => `${(x * 100).toFixed(x > 0 && x < 0.1 ? 1 : 0)}%`;
 
@@ -73,6 +74,7 @@ export default function Analytics() {
           <div className="mt-1 text-[22px] font-bold">{m.gensPaid}</div>
           <div className="text-[11px] text-mute">
             Из кэша вкладки: {m.gensCached}
+            {m.gensGemini > 0 && ` · Gemini: ${m.gensGemini}, расход $${m.spendUsd.toFixed(2)}`}
           </div>
         </div>
       </div>
@@ -115,6 +117,9 @@ export default function Analytics() {
 
       <details className="mt-6 rounded-2xl bg-bg2 p-4 text-[14px]">
         <summary className="cursor-pointer font-semibold text-ink2">Настройки демо</summary>
+        <div className="mt-4">
+          <PaidControl />
+        </div>
         <div className="mt-4">
           <span className="text-mute">Покупатель (история заказов)</span>
           <div className="mt-1 grid grid-cols-2 gap-1.5">

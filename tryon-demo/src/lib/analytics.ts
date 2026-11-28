@@ -34,6 +34,10 @@ export interface Ev {
   ms?: number;
   mode?: "photo" | "avatar";
   cached?: boolean;
+  /** режим генерации: платный (Gemini) или бесплатный */
+  gmode?: "free" | "paid";
+  /** сколько стоила генерация, $ */
+  costUsd?: number;
   /** из какого режима образ добавили в корзину */
   lookMode?: "for-you" | "new";
   /** что оценивали: примерку одной вещи или образ целиком */
@@ -77,6 +81,8 @@ export interface Metrics {
   convNoTryon: number; // из карточки без примерки в корзину
   gensPaid: number; // картинки, за которые заплатили
   gensCached: number; // картинки из кэша
+  gensGemini: number; // платные картинки (Gemini)
+  spendUsd: number; // расход на платные генерации, $
   votesUp: number;
   votesDown: number;
   votesByTarget: Record<"tryon" | "look", { up: number; down: number }>;
@@ -109,6 +115,8 @@ export function computeMetrics(ev: Ev[]): Metrics {
     convNoTryon: viewsNoTryon ? cartProduct / viewsNoTryon : 0,
     gensPaid: count("gen", (e) => !e.cached),
     gensCached: count("gen", (e) => !!e.cached),
+    gensGemini: count("gen", (e) => !e.cached && e.gmode === "paid"),
+    spendUsd: ev.filter((e) => e.type === "gen").reduce((a, e) => a + (e.costUsd ?? 0), 0),
     votesUp: count("vote_up"),
     votesDown: count("vote_down"),
     votesByTarget: {

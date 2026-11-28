@@ -12,9 +12,10 @@ import { recommendSize } from "../lib/size";
 import { fallback, tryOn, TryOnError } from "../lib/tryon";
 import { track } from "../lib/analytics";
 import RateGeneration from "../components/RateGeneration";
+import { usePaid } from "../lib/paid";
 
-type State = { k: "loading" } | { k: "done"; source: string } | { k: "error"; err: TryOnError };
-type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string; preview: boolean; degraded?: string } | { k: "error" };
+type State = { k: "loading" } | { k: "done"; source: string; gmode?: "free" | "paid" } | { k: "error"; err: TryOnError };
+type LookState = { k: "idle" } | { k: "loading" } | { k: "ready"; image: string; preview: boolean; degraded?: string; gmode?: "free" | "paid" } | { k: "error" };
 
 /** Через сколько секунд на экране результата считаем, что покупателю интересно (политика «по интересу») */
 const INTENT_DWELL_MS = 4000;
@@ -24,6 +25,7 @@ export default function Result({ id }: { id: string }) {
   const { person, results, setResult, settings, body, addToCart, showToast, tab, lookOff, setLookOff, lookSkips, noteLook } = useStore();
   const [st, setSt] = useState<State>(results[id] ? { k: "done", source: "cache" } : { k: "loading" });
   const [sheet, setSheet] = useState(false);
+  const paid = usePaid().active;
   const advice = recommendSize(item, body);
   const base = results[id];
 
@@ -34,7 +36,7 @@ export default function Result({ id }: { id: string }) {
     tryOn({ person: person.image, item, timeoutMs: settings.timeoutSec * 1000, accessCode: settings.accessCode, mode: person.mode, cacheable: person.mode === "avatar" && !settings.liveGen })
       .then((r) => {
         setResult(id, r.image);
-        setSt({ k: "done", source: r.source });
+        setSt({ k: "done", source: r.source, gmode: r.gmode });
       })
       .catch((e: TryOnError) => {
         track({ type: "tryon_fail", item: id });
@@ -55,6 +57,8 @@ export default function Result({ id }: { id: string }) {
   const [look, setLook] = useState<LookState>({ k: "idle" });
   const [wanted, setWanted] = useState(false); // пора ли собирать образ
   const [attempt, setAttempt] = useState(0);
+  const [genSig, setGenSig] = useState(""); // из каких вещей собрано фото образа
+  const sig = current ? current.items.map((x) => x.item.id).join(",") : "";
   const viewed = useRef(false);
   const shown = useRef(false);
 
@@ -81,7 +85,9 @@ export default function Result({ id }: { id: string }) {
       return;
     }
     if (!wanted || !current) return;
-    if (!second) {
+    // Платный режим: весь образ (включая обувь и аксессуары) одним запросом от исходного фото
+    const outfit = paid && !baseIsMock && current.items.length > 1;
+    if (!second && !outfit) {
       // образ без второго слоя на фото (например, к платью только обувь): фото основной вещи и список
       setLook({ k: "ready", image: base, preview: baseIsMock });
       shown.current = true;
@@ -90,17 +96,21 @@ export default function Result({ id }: { id: string }) {
     let alive = true;
     setLook({ k: "loading" });
     // Цепочка: результат основной примерки → поверх него вторая вещь. Основная вещь на обоих слайдах одна и та же.
-    tryOn({ person: base, item: second, timeoutMs: settings.timeoutSec * 1000, accessCode: settings.accessCode, cacheable: person?.mode === "avatar" && !settings.liveGen })
+    const req = outfit
+      ? tryOn({ person: person!.image, item, items: current.items.map((x) => x.item), timeoutMs: settings.timeoutSec * 1000, accessCode: settings.accessCode, cacheable: person?.mode === "avatar" && !settings.liveGen })
+      : tryOn({ person: base, item: second!, timeoutMs: settings.timeoutSec * 1000, accessCode: settings.accessCode, cacheable: person?.mode === "avatar" && !settings.liveGen });
+    req
       .then((r) => {
         if (!alive) return;
-        setLook({ k: "ready", image: r.image, preview: baseIsMock || r.source === "mock" });
+        setGenSig(sig);
+        setLook({ k: "ready", image: r.image, preview: baseIsMock || r.source === "mock", gmode: r.gmode });
         if (r.source !== "cache") track({ type: "look_ready", item: id });
         shown.current = true;
       })
       .catch(async (e: Error) => {
         // Если основная картинка сама пример без нейросети, образ тоже показываем примером
         if (baseIsMock) {
-          const r = await fallback(base, second);
+          const r = await fallback(base, second ?? item);
           if (alive) {
             setLook({ k: "ready", image: r.image, preview: baseIsMock || r.source === "mock" });
             shown.current = true;
@@ -115,7 +125,8 @@ export default function Result({ id }: { id: string }) {
     return () => {
       alive = false;
     };
-  }, [base, wanted, second, !!current, attempt, settings.timeoutSec, settings.accessCode, settings.liveGen, id, baseIsMock, person?.mode]);
+    // В платном режиме правки состава не запускают генерацию: деньги тратятся только по кнопке «Обновить фото»
+  }, [base, wanted, paid ? 0 : second?.id, paid ? !!current : current?.id, attempt, settings.timeoutSec, settings.accessCode, settings.liveGen, id, baseIsMock, person?.mode, paid]);
 
   // Уходя с экрана, запоминаем: предложенный образ открыли или проигнорировали
   useEffect(
@@ -254,6 +265,7 @@ export default function Result({ id }: { id: string }) {
               <div className="relative">
                 <BeforeAfter before={person.image} after={base} preview={baseIsMock} />
                 {baseIsMock && <p className="mt-2 text-center text-[13px] text-ink2">Посадка одежды условная</p>}
+                {st.gmode && <ModelBadge paid={st.gmode === "paid"} />}
                 {look.k === "ready" && (
                   <button
                     onPointerDown={(e) => e.stopPropagation()}
@@ -294,6 +306,15 @@ export default function Result({ id }: { id: string }) {
                     </div>
                   )}
                   {look.preview && <p className="mt-2 text-center text-[13px] text-ink2">Посадка одежды условная</p>}
+                  {paid && look.gmode === "paid" && genSig !== sig && (
+                    <div className="mt-2 flex items-center justify-between gap-3 rounded-xl bg-[#fff6e0] p-3 text-[13px] text-[#7a5600]">
+                      <span>Состав изменился, фото ещё прежнее</span>
+                      <button onClick={() => setAttempt((a) => a + 1)} className="shrink-0 rounded-lg bg-white px-3 py-1.5 font-semibold text-ink">
+                        Обновить фото
+                      </button>
+                    </div>
+                  )}
+                  {look.gmode && <ModelBadge paid={look.gmode === "paid"} />}
                   <LookReasons look={current} />
                   {look.k === "ready" && second && !look.degraded && <RateGeneration target="look" item={id} imageKey={`${current.id}:${look.image.length}`} className="mt-2" />}
                   </div>
@@ -388,6 +409,15 @@ export default function Result({ id }: { id: string }) {
         )}
 
       {sheet && <TryOnSheet item={item} onClose={() => setSheet(false)} onStart={() => setSheet(false)} />}
+    </div>
+  );
+}
+
+/** Чем сделано фото: платный режим нельзя включить и забыть */
+function ModelBadge({ paid }: { paid: boolean }) {
+  return (
+    <div className="mt-2 flex justify-center">
+      <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${paid ? "bg-[#fff1d6] text-[#8a5a00]" : "bg-bg2 text-mute"}`}>{paid ? "Gemini · платно" : "Бесплатная нейросеть"}</span>
     </div>
   );
 }

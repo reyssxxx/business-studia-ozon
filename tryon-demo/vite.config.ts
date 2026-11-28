@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { handleTryOn } from "./server/tryon";
 import { handleStyle } from "./server/style";
+import { handleUnlock } from "./server/auth";
 
 // Локально отдаём /api/tryon прямо из Vite (и в dev, и в preview), чтобы не нужен был vercel CLI.
 function localApi(env: Record<string, string>): Plugin {
@@ -22,6 +23,7 @@ function localApi(env: Record<string, string>): Plugin {
   const mount = (s: { middlewares: Connect.Server }) => {
     s.middlewares.use("/api/tryon", make(handleTryOn));
     s.middlewares.use("/api/style", make(handleStyle));
+    s.middlewares.use("/api/unlock", make(handleUnlock));
   };
   return { name: "local-api", configureServer: mount, configurePreviewServer: mount };
 }

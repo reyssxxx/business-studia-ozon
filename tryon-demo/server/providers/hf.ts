@@ -5,23 +5,32 @@
 import { Client, handle_file } from "@gradio/client";
 import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types.js";
 import { maskFor } from "./mask.js";
+import { withKeys } from "../keys.js";
 
 const clients = new Map<string, Promise<Client>>();
+// клиент на каждую пару «space + токен»: у разных токенов своя квота
 function space(id: string, token?: string): Promise<Client> {
-  let c = clients.get(id);
+  const k = `${id}|${token ?? "anon"}`;
+  let c = clients.get(k);
   if (!c) {
     c = Client.connect(id, token ? { token: token as `hf_${string}` } : {});
-    c.catch(() => clients.delete(id));
-    clients.set(id, c);
+    c.catch(() => clients.delete(k));
+    clients.set(k, c);
   }
   return c;
+}
+
+/** «Try again in 17:26:07» из сообщения ZeroGPU → миллисекунды */
+function retryMs(msg: string): number | undefined {
+  const m = /try again in (\d+):(\d+):(\d+)/i.exec(msg);
+  return m ? ((+m[1] * 60 + +m[2]) * 60 + +m[3]) * 1000 : undefined;
 }
 
 function wrap(e: unknown): ProviderError {
   if (e instanceof ProviderError) return e;
   const msg = (e as { message?: string })?.message ?? String(e);
   console.error("[tryon] hf", msg.slice(0, 300));
-  if (/quota/i.test(msg)) return new ProviderError("Бесплатный лимит нейросети на сегодня закончился", 429);
+  if (/quota|runs limit/i.test(msg)) return new ProviderError("Бесплатный лимит нейросети на сегодня закончился", 429, retryMs(msg) ?? 10 * 60_000);
   if (/queue|full|busy/i.test(msg)) return new ProviderError("Нейросеть сейчас перегружена, попробуйте ещё раз", 503);
   return new ProviderError("Бесплатная нейросеть не ответила", 502);
 }
@@ -42,8 +51,8 @@ async function idmVton(b: TryOnInput, token?: string): Promise<string> {
   return urlToDataUri((r.data as { url: string }[])[0].url, token);
 }
 
-async function leffa(b: TryOnInput, token?: string): Promise<string> {
-  const c = await space("franciszzj/Leffa", token);
+async function leffa(b: TryOnInput, token?: string, spaceId = "franciszzj/Leffa"): Promise<string> {
+  const c = await space(spaceId, token);
   const r = await c.predict("/leffa_predict_vt", {
     src_image_path: handle_file(toBlob(b.personImage)),
     ref_image_path: handle_file(toBlob(b.garmentImage)),
@@ -58,19 +67,36 @@ async function leffa(b: TryOnInput, token?: string): Promise<string> {
   return urlToDataUri((r.data as { url: string }[])[0].url, token);
 }
 
-export const hf: Provider = async (b, env) => {
-  const token = env.HF_TOKEN || undefined;
-  // IDM-VTON заказывает у Hugging Face около 60 секунд GPU, Leffa 120 и больше. Поэтому IDM-VTON идёт первой для всех
-  // категорий: на бесплатном аккаунте её хватает надолго, а Leffa остаётся запасной. HF_LOWER_MODEL=leffa вернёт старый порядок.
-  const lowerFirstLeffa = env.HF_LOWER_MODEL === "leffa" && b.category !== "tops";
-  const chain = lowerFirstLeffa ? [leffa, idmVton] : [idmVton, leffa];
+// Если Hugging Face отказал Leffa из-за квоты, следующие 5 минут не тратим на неё время (для этого токена)
+const leffaSkipUntil = new Map<string, number>();
+const QUOTA = /requested vs|quota/i;
+
+export const hf: Provider = (b, env) =>
+  // токены по кругу: расходуем квоты поровну; когда на токене лимит, он встаёт на паузу и берётся следующий. Без токенов работаем анонимно.
+  withKeys("hf", env, (token) => hfChain(b, token, env), { strategy: "round-robin", allowAnonymous: true });
+
+async function hfChain(b: TryOnInput, token: string | undefined, env: Record<string, string | undefined>): Promise<string> {
+  // LEFFA_SPACE: своя копия Leffa (Space на платном GPU или любой адрес с её API). Без квоты ZeroGPU она не падает.
+  const leffaSpace = env.LEFFA_SPACE || "franciszzj/Leffa";
+  const runLeffa = (x: TryOnInput, t?: string) => leffa(x, t, leffaSpace);
+  const skipKey = token ?? "anon";
+
+  // Верх: IDM-VTON (она заказывает около 60 секунд GPU), запасная Leffa.
+  // Низ и платья: Leffa даёт лучший результат, но заказывает 120+ секунд и на бесплатной квоте иногда отказывает.
+  // Тогда следом идёт IDM-VTON со своей маской. HF_LOWER_MODEL=idm ставит IDM-VTON первой.
+  const lowerIdmFirst = env.HF_LOWER_MODEL === "idm";
+  const chain = b.category === "tops" || lowerIdmFirst ? [idmVton, runLeffa] : [runLeffa, idmVton];
+
   let last: ProviderError | null = null;
   for (const model of chain) {
+    if (model === runLeffa && Date.now() < (leffaSkipUntil.get(skipKey) ?? 0) && chain.length > 1) continue;
     try {
       return await model(b, token);
     } catch (e) {
-      last = wrap(e); // у каждого спейса своя очередь, пробуем следующий
+      last = wrap(e); // у каждого спейса своя очередь и квота, пробуем следующий
+      const msg = (e as { message?: string })?.message ?? "";
+      if (model === runLeffa && QUOTA.test(msg)) leffaSkipUntil.set(skipKey, Date.now() + 5 * 60_000);
     }
   }
-  throw last ?? new ProviderError("Нейросеть не ответила");
-};
+  throw last ?? new ProviderError("Нейросеть не ответила", 502);
+}

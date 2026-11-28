@@ -3,6 +3,7 @@
 // и по текстовой инструкции «надевает» вещь. Качество ниже, чем у IDM-VTON и FASHN,
 // зато лимит не связан с Hugging Face. Нужен бесплатный ключ: https://enter.pollinations.ai/keys
 import { ProviderError, toBlob, urlToDataUri, type Provider, type TryOnInput } from "./types.js";
+import { withKeys } from "../keys.js";
 
 const ENDPOINT = "https://gen.pollinations.ai/v1/images/edits";
 const MODEL = "black-forest-labs/flux.2-klein-4b";
@@ -22,7 +23,9 @@ function prompt(b: TryOnInput): string {
   ].join(" ");
 }
 
-export const pollinations: Provider = async (b, env) => {
+export const pollinations: Provider = (b, env) => withKeys("pollinations", env, (key) => pollinationsCall(b, key!), { strategy: "ordered" });
+
+async function pollinationsCall(b: TryOnInput, key: string): Promise<string> {
   const form = new FormData();
   form.append("model", MODEL);
   form.append("prompt", prompt(b));
@@ -33,11 +36,11 @@ export const pollinations: Provider = async (b, env) => {
 
   const r = await fetch(ENDPOINT, {
     method: "POST",
-    headers: { Authorization: `Bearer ${env.POLLINATIONS_KEY}` },
+    headers: { Authorization: `Bearer ${key}` },
     body: form,
     signal: AbortSignal.timeout(90_000),
   });
-  if (r.status === 429 || r.status === 402) throw new ProviderError("Бесплатный лимит запасной нейросети закончился", 429);
+  if (r.status === 429 || r.status === 402) throw new ProviderError("Бесплатный лимит запасной нейросети закончился", 429, 60 * 60_000);
   if (!r.ok) {
     console.error("[tryon] pollinations", r.status, (await r.text().catch(() => "")).slice(0, 300));
     throw new ProviderError("Запасная нейросеть не ответила");
@@ -47,4 +50,4 @@ export const pollinations: Provider = async (b, env) => {
   if (item?.b64_json) return `data:image/png;base64,${item.b64_json}`;
   if (item?.url) return urlToDataUri(item.url);
   throw new ProviderError("Пустой ответ запасной нейросети");
-};
+}
